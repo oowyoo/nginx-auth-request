@@ -1,43 +1,64 @@
-# Nginx Auth Request Demo
+# Nginx Auth Request Demo (Traefik Version)
 
-This project demonstrates how to use Nginx's `auth_request` module to authenticate requests based on HTTP headers.
+This project demonstrates how to use Traefik to replace Nginx and implement authentication proxy based on HTTP headers.
 
-## Architecture
+## Project Structure
 
-The setup consists of three services:
-
-2. **Auth**: A Flask service that validates the `x-pretest` header.
-3. **Nginx**: Acts as a gateway, using `auth_request` to validate incoming requests.
-
-## How it works
-
-1. The client sends requests to Nginx with or without the `x-pretest` header
-2. Nginx forwards the authentication headers to the auth service
-3. The auth service checks if the `x-pretest` header contains a valid token
-4. If authentication succeeds, Nginx processes the request; otherwise, it returns a 401 error
-
-## Valid Authentication
-
-A valid request must include the header: `x-pretest: valid-token`
-
-## Running the Demo
-
-```bash
-docker compose up --build
+```
+.
+├── auth/                # Flask Auth Service
+├── traefik/             # Traefik Configuration
+│   ├── traefik.yml      # Traefik Static Config
+│   └── dynamic/
+│       └── dynamic.yml  # Traefik Dynamic Config (ForwardAuth)
+├── docker-compose.yml   # Local Compose
+└── README.md
 ```
 
-## Testing
+## Traefik Auth Proxy Solution
 
-You can test manually:
+- All requests are first forwarded by Traefik's ForwardAuth middleware to the `auth` service `/auth` endpoint for header validation
+- If validation passes, the request proceeds to the backend; otherwise, a 401 is returned
+- Fully replaces the original Nginx auth proxy solution, compatible with Kubernetes IngressRoute configuration concepts
 
-```bash
-# Valid request
+## How to Start
+
+1. Install and start Docker Desktop
+2. In the project root directory, run:
+
+   ```sh
+   docker compose up --build
+   ```
+
+3. Wait for both `auth` and `traefik` services to start successfully
+
+## How to Test
+
+### PowerShell (Recommended)
+
+```powershell
+Invoke-WebRequest -Uri "http://localhost:8080/health"
+Invoke-WebRequest -Uri "http://localhost:8080/health" -Headers @{"x-pretest"="valid-token"}
+Invoke-WebRequest -Uri "http://localhost:8080/health" -Headers @{"x-pretest"="wrong-token"}
+```
+
+### Linux/macOS/curl
+
+```sh
+curl http://localhost:8080/health
 curl -H "x-pretest: valid-token" http://localhost:8080/health
-curl -H "x-pretest: valid-token" http://localhost:8080/404
-
-# Invalid request
 curl -H "x-pretest: wrong-token" http://localhost:8080/health
+```
 
-# Missing header
-curl http://localhost:8080
-``` 
+- No header or wrong header returns 401
+- Correct header (`x-pretest: valid-token`) returns 200
+
+## Traefik Dashboard
+
+Visit [http://localhost:8081/dashboard/](http://localhost:8081/dashboard/) in your browser to view Traefik routes and middleware.
+
+## Other Notes
+
+- All original Nginx-related files have been removed; everything is now implemented with Traefik
+- To restore the Nginx solution, refer to the commit history
+- This project is for demonstration and interview testing only. For production, please use a secure WSGI server and a robust authentication solution. 
